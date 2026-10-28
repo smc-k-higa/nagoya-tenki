@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>名古屋市 天気予報</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 40px 60px;
+    }
+
+    /* ヘッダー */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 2px solid rgba(255,255,255,0.15);
+      margin-bottom: 24px;
+      flex-shrink: 0;
+    }
+
+    .city-name {
+      font-size: 3.2rem;
+      font-weight: bold;
+      letter-spacing: 5px;
+    }
+
+    .city-name span {
+      display: block;
+      font-size: 1.2rem;
+      color: #aad4f5;
+      letter-spacing: 4px;
+      margin-bottom: 6px;
+    }
+
+    .datetime {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .current-date {
+      font-size: 5rem;
+      font-weight: 200;
+      letter-spacing: 4px;
+      color: #aad4f5;
+      line-height: 1;
+    }
+
+    .current-time {
+      font-size: 5rem;
+      font-weight: 200;
+      letter-spacing: 4px;
+      line-height: 1;
+    }
+
+    /* スクロールビューポート */
+    .scroll-viewport {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      min-height: 0;
+    }
+
+    .scroll-track {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: absolute;
+      width: 100%;
+      animation: scrollUp var(--scroll-duration, 40s) linear infinite;
+    }
+
+    @keyframes scrollUp {
+      0%   { transform: translateY(0); }
+      100% { transform: translateY(-50%); }
+    }
+
+    .scroll-viewport::before,
+    .scroll-viewport::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      height: 80px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .scroll-viewport::before {
+      top: 0;
+      background: linear-gradient(to bottom, #1a2d3d, transparent);
+    }
+
+    .scroll-viewport::after {
+      bottom: 0;
+      background: linear-gradient(to top, #1a2d3d, transparent);
+    }
+
+    /* カード */
+    .weather-card {
+      background: rgba(255,255,255,0.08);
+      border-radius: 28px;
+      padding: 28px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0;
+      backdrop-filter: blur(12px);
+      border: 2px solid rgba(255,255,255,0.1);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+      width: 100%;
+    }
+
+    .weather-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 8px;
+      background: rgba(255,255,255,0.15);
+    }
+
+    .weather-card.now {
+      background: rgba(100,180,255,0.18);
+      border-color: rgba(100,180,255,0.45);
+    }
+
+    .weather-card.now::before {
+      background: linear-gradient(to bottom, #4fc3f7, #0288d1);
+    }
+
+    /* 時刻 */
+    .card-time {
+      font-size: 3.2rem;
+      color: #aad4f5;
+      letter-spacing: 4px;
+      font-weight: 300;
+      width: 14%;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .weather-card.now .card-time {
+      color: #4fc3f7;
+      font-weight: 600;
+    }
+
+    /* アイコン＋説明 */
+    .card-icon-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 16%;
+      flex-shrink: 0;
+    }
+
+    .card-icon {
+      font-size: 5rem;
+      line-height: 1;
+    }
+
+    .card-desc {
+      font-size: 1.6rem;
+      color: #cce4f7;
+      white-space: nowrap;
+    }
+
+    /* 気温 */
+    .card-temp {
+      font-size: 6rem;
+      font-weight: 200;
+      line-height: 1;
+      width: 22%;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .card-temp sup {
+      font-size: 2.4rem;
+      vertical-align: top;
+      margin-top: 12px;
+    }
+
+    /* 区切り */
+    .card-divider {
+      width: 2px;
+      height: 100px;
+      background: rgba(255,255,255,0.2);
+      flex-shrink: 0;
+    }
+
+    /* 詳細（湿度・降水確率） */
+    .card-details {
+      display: flex;
+      gap: 0;
+      align-items: center;
+      justify-content: space-around;
+      width: 42%;
+      flex-shrink: 0;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .detail-label {
+      font-size: 1.6rem;
+      color: #aad4f5;
+      white-space: nowrap;
+    }
+
+    .detail-value {
+      font-size: 3.2rem;
+      font-weight: 600;
+    }
+
+    /* フッター */
+    .footer {
+      margin-top: 12px;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 8px;
+    }
+
+    /* ローディング */
+    .loading {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.2rem;
+      color: #aad4f5;
+    }
+
+    .spinner {
+      width: 80px;
+      height: 80px;
+      border: 6px solid rgba(255,255,255,0.15);
+      border-top-color: #4fc3f7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 32px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ff6b6b;
+      font-size: 2.8rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="city-name">
+      <span>NAGOYA CITY WEATHER</span>
+      名古屋市 天気予報
+    </div>
+    <div class="datetime">
+      <div class="current-date" id="dateDisplay">----年--月--日（--）</div>
+      <div class="current-time" id="clock">--:--</div>
+    </div>
+  </div>
+
+  <div class="scroll-viewport" id="viewport">
+    <div class="loading" id="app">
+      <div class="spinner"></div>データを取得中...
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>📍 名古屋市 / 緯度 35.18° 経度 136.91°</div>
+    <div id="updateTime">--</div>
+  </div>
+
+<script>
+  const CONFIG = {
+    lat: 35.1815,
+    lon: 136.9066,
+    updateInterval: 10 * 60 * 1000,
+    scrollDuration: 40,
+  };
+
+  const WEATHER_MAP = {
+    0:  { icon: '☀️',  desc: '快晴' },
+    1:  { icon: '🌤️', desc: 'ほぼ晴れ' },
+    2:  { icon: '⛅',  desc: '一部曇り' },
+    3:  { icon: '☁️',  desc: '曇り' },
+    45: { icon: '🌫️', desc: '霧' },
+    48: { icon: '🌫️', desc: '霧氷' },
+    51: { icon: '🌦️', desc: '霧雨(弱)' },
+    53: { icon: '🌦️', desc: '霧雨' },
+    55: { icon: '🌧️', desc: '霧雨(強)' },
+    61: { icon: '🌧️', desc: '雨(弱)' },
+    63: { icon: '🌧️', desc: '雨' },
+    65: { icon: '🌧️', desc: '大雨' },
+    71: { icon: '🌨️', desc: '雪(弱)' },
+    73: { icon: '🌨️', desc: '雪' },
+    75: { icon: '❄️',  desc: '大雪' },
+    80: { icon: '🌦️', desc: 'にわか雨' },
+    81: { icon: '🌦️', desc: 'にわか雨' },
+    82: { icon: '⛈️',  desc: 'にわか大雨' },
+    95: { icon: '⛈️',  desc: '雷雨' },
+    99: { icon: '⛈️',  desc: '激しい雷雨' },
+  };
+
+  function getWeatherInfo(code) {
+    return WEATHER_MAP[code] || { icon: '🌡️', desc: '不明' };
+  }
+
+  function updateClock() {
+    const now  = new Date();
+    const days = ['日','月','火','水','木','金','土'];
+    document.getElementById('clock').textContent =
+      `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('dateDisplay').textContent =
+      `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${days[now.getDay()]}）`;
+  }
+
+  async function fetchWeather() {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?` +
+      `latitude=${CONFIG.lat}&longitude=${CONFIG.lon}` +
+      `&hourly=temperature_2m,relativehumidity_2m,precipitation_probability,weathercode` +
+      `&timezone=Asia%2FTokyo` +
+      `&forecast_days=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API取得に失敗しました');
+    return res.json();
+  }
+
+  function renderWeather(data) {
+    const now      = new Date();
+    const currentH = now.getHours();
+    const hourly   = data.hourly;
+
+    const targets = [0, 3, 6, 9, 12, 15, 18, 21];
+
+    const cards = targets.map(h => {
+      const idx = hourly.time.findIndex(t => new Date(t).getHours() === h);
+      if (idx < 0) return null;
+      const nextH = targets[targets.indexOf(h) + 1] ?? 24;
+      return {
+        time: `${String(h).padStart(2,'0')}:00`,
+        temp: Math.round(hourly.temperature_2m[idx]),
+        hum:  hourly.relativehumidity_2m[idx],
+        rain: hourly.precipitation_probability[idx],
+        code: hourly.weathercode[idx],
+        isNow: (currentH >= h && currentH < nextH),
+      };
+    }).filter(Boolean);
+
+    const cardHTML = cards.map(c => {
+      const wi = getWeatherInfo(c.code);
+      return `
+        <div class="weather-card ${c.isNow ? 'now' : ''}">
+          <div class="card-time">${c.time}</div>
+          <div class="card-icon-wrap">
+            <div class="card-icon">${wi.icon}</div>
+            <div class="card-desc">${wi.desc}</div>
+          </div>
+          <div class="card-temp">${c.temp}<sup>°C</sup></div>
+          <div class="card-divider"></div>
+          <div class="card-details">
+            <div class="detail-item">
+              <span class="detail-label">💧 湿度</span>
+              <span class="detail-value">${c.hum}%</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🌂 降水確率</span>
+              <span class="detail-value">${c.rain}%</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const viewport = document.getElementById('viewport');
+    viewport.innerHTML = `
+      <div class="scroll-track" style="--scroll-duration:${CONFIG.scrollDuration}s">
+        ${cardHTML}
+        ${cardHTML}
+      </div>
+    `;
+
+    const n = new Date();
+    document.getElementById('updateTime').textContent =
+      `最終更新: ${n.getFullYear()}/${n.getMonth()+1}/${n.getDate()} ` +
+      `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  }
+
+  async function loadData() {
+    const viewport = document.getElementById('viewport');
+    viewport.innerHTML = `<div class="loading"><div class="spinner"></div>データを取得中...</div>`;
+    try {
+      const data = await fetchWeather();
+      renderWeather(data);
+    } catch (e) {
+      viewport.innerHTML = `<div class="error">⚠️ ${e.message}</div>`;
+    }
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+  loadData();
+  setInterval(loadData, CONFIG.updateInterval);
+</script>
+
+</body>
+</html>
